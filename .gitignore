@@ -16,3 +16,8 @@ node_modules/
 
 # Mac
 .DS_Store
+
+
+/vendor
+/bin
+fastlane/report.xml

@@ -1,0 +1,97 @@
+# update_fastlane
+
+BOB_VERSION = "1.2.190"
+BOB_URL = "https://github.com/defold/defold/releases/download/#{BOB_VERSION}/bob.jar"
+keystore_secrets = "#{Dir.pwd}/keysore.secret"
+
+RESULT_DIR = ENV.fetch("BITRISE_DEPLOY_DIR", "result/")
+
+default_platform(:ios)
+
+#hidden from lanes,list,docs
+desc "Do build job"
+private_lane :do_build do |options|
+  #add actions here
+  UI.message "Build stared"
+
+  ENV.each do |key, value|
+    UI.important "ENV: #{key} = '#{value}'"
+  end
+
+  bob_jar = "#{ENV.fetch("BITRISE_TMP_DIR", ".")}/bob.jar"
+  keystore_pass = ENV.fetch("BITRISEIO_ANDROID_KEYSTORE_PASSWORD", "")
+
+  File.write(keystore_secrets, keystore_pass)
+  artifacts = []
+
+  Dir.chdir("..") do
+
+    sh("curl", "-Lv", "-o", bob_jar, BOB_URL, step_name: "Fetch bob #{BOB_VERSION}") unless  File.exist?(bob_jar)
+    sh("java", "-version", step_name: "Show java version")
+    sh("java", "-jar", bob_jar, "--version", step_name: "Show bob version")
+    sh("java", "-jar", bob_jar, "--email", "foo@bar.com", "--auth", "fooba", "resolve", step_name: "Resolve deps")
+
+    args = ["java", "-jar", bob_jar,  "--with-symbols"]
+    args <<"--archive"
+
+    case lane_context[SharedValues::PLATFORM_NAME]
+    when :android
+      args << "--keystore"
+      args << ENV.fetch("ANDROID_KEYSTORE_PATH", "mykeystore.keystore")
+      args << "--keystore-pass"
+      args << keystore_secrets
+      args << "--keystore-alias"
+      args << "myAlias"
+      platform = "armv7-android"
+      arches = [ "arm64-android"]
+      artifacts = [ "build/default/Defold-examples/*.apk"  ]
+    when :ios
+      platform = "armv7-darwin"
+      arches = [ "arm64-darwin" ]
+      artifacts = [ "build/default/Defold-examples.ipa" ]
+    else
+      UI.user_error!("Platform unsupported: #{lane_context[SharedValues::PLATFORM_NAME]}")
+    end
+
+    args <<  "--platform"
+    args << platform
+    args << "--architectures"
+    args <<  arches.join(",")
+    # args << "--resource-cache-local"
+    # args << File.join(Dir.pwd, "build-cache")
+    args << "--verbose" if FastlaneCore::Globals.verbose?
+  #  args << "--bundle-output"
+    args << "distclean"
+    args << "build"
+    args << "bundle"
+
+    sh(args, step_name: "Build app")
+  end
+
+  copy_artifacts(
+    artifacts: artifacts,
+    target_path: RESULT_DIR,
+    fail_on_missing: true,
+  )
+end
+
+
+platform :ios do
+  desc "Description of what the lane does"
+  lane :build do
+    # add actions here: https://docs.fastlane.tools/actions
+
+    do_build
+  end
+end
+
+#build/default/Defold-examples
+
+platform :android do
+  desc "Description of what the lane does"
+  lane :build do
+    # add actions here: https://docs.fastlane.tools/actions
+    do_build
+
+  end
+end
