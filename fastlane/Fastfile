@@ -57,8 +57,8 @@ private_lane :do_build do |options|
     args << platform
     args << "--architectures"
     args <<  arches.join(",")
-    # args << "--resource-cache-local"
-    # args << File.join(Dir.pwd, "build-cache")
+    args << "--resource-cache-local"
+    args << File.join(Dir.pwd, "build-cache")
     args << "--verbose" if FastlaneCore::Globals.verbose?
   #  args << "--bundle-output"
     args << "distclean"
